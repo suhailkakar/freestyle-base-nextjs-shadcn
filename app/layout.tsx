@@ -1,6 +1,5 @@
 "use client";
 
-import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import React, { useEffect } from "react";
@@ -56,16 +55,40 @@ function ClientEditOutline() {
       return tag;
     }
 
-    function mouseOver(e: MouseEvent) {
+    function handleClick(e: MouseEvent) {
       if (!hasEditParam()) return;
-      const target = e.target as HTMLElement;
+      // Block native click actions and other handlers
+      e.preventDefault();
+      e.stopPropagation();
+      type WithStopImmediate = MouseEvent & {
+        stopImmediatePropagation: () => void;
+      };
+      if ("stopImmediatePropagation" in e)
+        (e as WithStopImmediate).stopImmediatePropagation();
+
+      let target = e.target as HTMLElement;
+      if (!target) return;
       if (
-        !target ||
-        target === document.body ||
-        target === document.documentElement
-      )
+        target.classList.contains("___edit-outline-label") &&
+        target.parentElement
+      ) {
+        target = target.parentElement as HTMLElement;
+      }
+      if (target === document.body || target === document.documentElement)
         return;
-      if (target.classList.contains("___edit-outline-label")) return;
+
+      // Toggle selection on same element
+      if (lastTarget && lastTarget === target) {
+        lastTarget.classList.remove(outlineClass);
+        if (labelDiv) {
+          labelDiv.remove();
+          labelDiv = null;
+        }
+        lastTarget = null;
+        return;
+      }
+
+      // Clear previous selection
       if (lastTarget && lastTarget !== target) {
         lastTarget.classList.remove(outlineClass);
         if (labelDiv) {
@@ -73,6 +96,8 @@ function ClientEditOutline() {
           labelDiv = null;
         }
       }
+
+      // Select new element
       lastTarget = target;
       target.classList.add(outlineClass);
       if (!labelDiv) {
@@ -83,48 +108,8 @@ function ClientEditOutline() {
       if (!target.contains(labelDiv)) target.appendChild(labelDiv);
     }
 
-    function mouseOut(e: MouseEvent) {
-      const target = e.target as HTMLElement;
-      if (target && target.classList) target.classList.remove(outlineClass);
-      if (labelDiv) {
-        labelDiv.remove();
-        labelDiv = null;
-      }
-      lastTarget = null;
-    }
-
-    function handleClick(e: MouseEvent) {
-      const target = e.target as HTMLElement;
-      if (
-        target &&
-        target.classList &&
-        target.classList.contains(outlineClass)
-      ) {
-        const outerHTML = target.outerHTML;
-        if (
-          (window as any).ReactNativeWebView &&
-          typeof (window as any).ReactNativeWebView.postMessage === "function"
-        ) {
-          (window as any).ReactNativeWebView.postMessage(
-            JSON.stringify({ outerHTML })
-          );
-        }
-        // Remove highlight and label immediately
-        target.classList.remove(outlineClass);
-        if (labelDiv) {
-          labelDiv.remove();
-          labelDiv = null;
-        }
-        lastTarget = null;
-      }
-    }
-
-    document.body.addEventListener("mouseover", mouseOver, true);
-    document.body.addEventListener("mouseout", mouseOut, true);
     document.body.addEventListener("click", handleClick, true);
     return () => {
-      document.body.removeEventListener("mouseover", mouseOver, true);
-      document.body.removeEventListener("mouseout", mouseOut, true);
       document.body.removeEventListener("click", handleClick, true);
     };
   }, []);
